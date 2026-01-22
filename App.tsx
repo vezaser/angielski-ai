@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Layout } from './components/Layout';
 import { CATEGORIES, FALLBACK_WORDS } from './constants';
 import { AppMode, Category, Word } from './types';
@@ -16,8 +16,6 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [testScore, setTestScore] = useState<number | null>(null);
   const [learningFinished, setLearningFinished] = useState(false);
-  const [showInstallTip, setShowInstallTip] = useState(false);
-  const [showShareModal, setShowShareModal] = useState(false);
 
   const saveProgress = (type: 'LEARN' | 'TEST', categoryId: string, score?: number, total?: number) => {
     const raw = localStorage.getItem('english_progress');
@@ -43,24 +41,35 @@ const App: React.FC = () => {
     setLearningFinished(false);
     setTestScore(null);
     
-    let fetched = await fetchCategoryWords(cat.name);
-    
-    if (fetched.length === 0) {
-      fetched = FALLBACK_WORDS[cat.id] || FALLBACK_WORDS['animals'];
+    try {
+      let fetched = await fetchCategoryWords(cat.name);
+      
+      // Jeśli AI nie zwróciło słówek, ładujemy te z pliku localnego
+      if (!fetched || fetched.length === 0) {
+        fetched = FALLBACK_WORDS[cat.id] || FALLBACK_WORDS['animals'];
+      }
+
+      const mappedWords: Word[] = fetched.map((w, idx) => ({
+        id: `${cat.id}-${idx}`,
+        english: w.english,
+        polish: w.polish,
+        category: cat.id
+      }));
+
+      const shuffledWords = [...mappedWords].sort(() => Math.random() - 0.5);
+
+      setWords(shuffledWords);
+      setMode('CATEGORY_SELECT');
+    } catch (err) {
+      console.error("Krytyczny błąd ładowania kategorii:", err);
+      // Ostateczny ratunek - zawsze użyj fallbacków
+      const backup = FALLBACK_WORDS[cat.id] || FALLBACK_WORDS['animals'];
+      setWords(backup.map((w, i) => ({ id: `${cat.id}-${i}`, ...w, category: cat.id })));
+      setMode('CATEGORY_SELECT');
+    } finally {
+      // To się wykona ZAWSZE, nawet po błędzie, więc ładowanie zniknie
+      setIsLoading(false);
     }
-
-    const mappedWords: Word[] = fetched.map((w, idx) => ({
-      id: `${cat.id}-${idx}`,
-      english: w.english,
-      polish: w.polish,
-      category: cat.id
-    }));
-
-    const shuffledWords = [...mappedWords].sort(() => Math.random() - 0.5);
-
-    setWords(shuffledWords);
-    setIsLoading(false);
-    setMode('CATEGORY_SELECT');
   };
 
   const handleBack = () => {
@@ -68,24 +77,18 @@ const App: React.FC = () => {
     else if (mode === 'LEARN' || mode === 'TEST') setMode('CATEGORY_SELECT');
   };
 
-  const currentUrl = window.location.href;
-  const isBlobUrl = currentUrl.startsWith('blob:');
-
-  const copyLink = () => {
-    if (isBlobUrl) {
-      alert('Ten link jest tymczasowy (blob). Kliknij ikonkę "strzałki w kwadracie" nad oknem aplikacji, aby otworzyć ją w nowym oknie i dostać prawdziwy link!');
-      return;
-    }
-    navigator.clipboard.writeText(currentUrl);
-    alert('Link skopiowany! Wyślij go teraz na swój telefon (np. mailem lub WhatsApp).');
-  };
-
   const renderContent = () => {
     if (isLoading) {
       return (
-        <div className="flex flex-col items-center justify-center h-full min-h-[60vh] space-y-4">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-blue-600 font-medium text-lg">Przygotowuję naukę...</p>
+        <div className="flex flex-col items-center justify-center h-full min-h-[60vh] space-y-6">
+          <div className="relative">
+            <div className="w-20 h-20 border-8 border-blue-100 rounded-full"></div>
+            <div className="absolute top-0 left-0 w-20 h-20 border-8 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+          <div className="text-center">
+            <p className="text-blue-600 font-bold text-xl animate-pulse">Przygotowuję lekcję...</p>
+            <p className="text-gray-400 text-sm mt-2">To potrwa tylko chwilkę</p>
+          </div>
         </div>
       );
     }
@@ -93,27 +96,10 @@ const App: React.FC = () => {
     switch (mode) {
       case 'HOME':
         return (
-          <div className="space-y-6 pb-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="text-center space-y-2 py-4 relative">
+          <div className="space-y-6 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="text-center space-y-1 py-4">
               <h2 className="text-4xl font-bold text-gray-800 tracking-tight">Cześć! 👋</h2>
-              <p className="text-gray-500 text-lg">Wybierz kategorię słówek:</p>
-              
-              <div className="absolute -top-2 -right-2 flex gap-2">
-                <button 
-                  onClick={() => setShowShareModal(true)}
-                  className="w-10 h-10 bg-white shadow-sm border border-gray-100 rounded-full flex items-center justify-center text-blue-500 text-sm"
-                  title="Udostępnij"
-                >
-                  🔗
-                </button>
-                <button 
-                  onClick={() => setShowInstallTip(true)}
-                  className="w-10 h-10 bg-white shadow-sm border border-gray-100 rounded-full flex items-center justify-center text-blue-500 font-bold"
-                  title="Instrukcja"
-                >
-                  i
-                </button>
-              </div>
+              <p className="text-gray-500 text-lg">Wybierz temat nauki:</p>
             </div>
             
             <div className="grid grid-cols-2 gap-4 px-2">
@@ -128,77 +114,6 @@ const App: React.FC = () => {
                 </button>
               ))}
             </div>
-
-            {/* Share Modal */}
-            {showShareModal && (
-              <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-6" onClick={() => setShowShareModal(false)}>
-                <div className="bg-white rounded-[2.5rem] p-8 max-w-sm w-full space-y-6 animate-in zoom-in duration-300" onClick={e => e.stopPropagation()}>
-                  <h3 className="text-2xl font-bold text-gray-800 text-center">🔗 Udostępnij</h3>
-                  
-                  {isBlobUrl ? (
-                    <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200 space-y-3">
-                      <p className="text-sm text-amber-800 font-bold flex items-center gap-2">
-                        <span>⚠️</span> Uwaga: Link tymczasowy
-                      </p>
-                      <p className="text-xs text-amber-700 leading-relaxed">
-                        Widzę, że masz adres <b>blob:</b>. Aby dostać link na telefon, kliknij ikonkę <b>strzałki w kwadracie</b> w prawym górnym rogu (nad tym podglądem). Gdy otworzy się nowa karta, skopiuj adres z paska u góry!
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <p className="text-sm text-gray-500 text-center leading-relaxed">
-                        Wyślij ten link na telefon, a potem otwórz go w <b>Safari</b>.
-                      </p>
-                      <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 break-all text-[10px] font-mono text-gray-400 max-h-24 overflow-y-auto">
-                        {currentUrl}
-                      </div>
-                      <button 
-                        onClick={copyLink}
-                        className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2"
-                      >
-                        <span>📋</span> Kopiuj Link
-                      </button>
-                    </div>
-                  )}
-                  
-                  <button 
-                    onClick={() => setShowShareModal(false)}
-                    className="w-full py-2 text-gray-400 font-bold text-sm"
-                  >
-                    Zamknij
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Install Modal */}
-            {showInstallTip && (
-              <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-6" onClick={() => setShowInstallTip(false)}>
-                <div className="bg-white rounded-[2.5rem] p-8 max-w-sm w-full space-y-6 animate-in zoom-in duration-300" onClick={e => e.stopPropagation()}>
-                  <h3 className="text-2xl font-bold text-gray-800 text-center">📱 Na iPhone</h3>
-                  <div className="space-y-4 text-gray-600 text-sm">
-                    <div className="flex gap-4 items-start">
-                      <span className="bg-blue-100 text-blue-600 w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-xs">1</span>
-                      <p>Otwórz link w <b>Safari</b>.</p>
-                    </div>
-                    <div className="flex gap-4 items-start">
-                      <span className="bg-blue-100 text-blue-600 w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-xs">2</span>
-                      <p>Kliknij ikonkę <b>Udostępnij</b> (kwadrat ze strzałką).</p>
-                    </div>
-                    <div className="flex gap-4 items-start">
-                      <span className="bg-blue-100 text-blue-600 w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-xs">3</span>
-                      <p>Wybierz <b>"Do ekranu początkowego"</b>.</p>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => setShowInstallTip(false)}
-                    className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold"
-                  >
-                    Rozumiem!
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         );
 
@@ -214,7 +129,7 @@ const App: React.FC = () => {
             <div className="text-center p-10 bg-white border-2 border-gray-50 rounded-[3rem] shadow-sm">
               <span className="text-8xl mb-4 block drop-shadow-lg">{selectedCategory?.icon}</span>
               <h3 className="text-3xl font-bold text-gray-800">{selectedCategory?.name}</h3>
-              <p className="text-gray-500 text-lg">{words.length} słówek do odkrycia</p>
+              <p className="text-gray-500 text-lg">{words.length} słówek do nauki</p>
             </div>
 
             <div className="space-y-4">
@@ -226,7 +141,7 @@ const App: React.FC = () => {
                   <span className="text-3xl">📖</span>
                   <div className="text-left">
                     <h4 className="font-bold text-xl">Zacznij Naukę</h4>
-                    <p className="text-sm opacity-90">Słówka będą w losowej kolejności</p>
+                    <p className="text-sm opacity-90">Poznaj nowe słowa</p>
                   </div>
                 </div>
                 <span className="text-2xl font-bold">→</span>
@@ -240,7 +155,7 @@ const App: React.FC = () => {
                   <span className="text-3xl">🏆</span>
                   <div className="text-left">
                     <h4 className="font-bold text-xl">Rób Test</h4>
-                    <p className="text-sm opacity-90">Sprawdź co już umiesz</p>
+                    <p className="text-sm opacity-90">Sprawdź swoją wiedzę</p>
                   </div>
                 </div>
                 <span className="text-2xl font-bold">→</span>
