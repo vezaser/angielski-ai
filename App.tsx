@@ -44,7 +44,6 @@ const App: React.FC = () => {
     try {
       let fetched = await fetchCategoryWords(cat.name);
       
-      // Jeśli AI nie zwróciło słówek, ładujemy te z pliku localnego
       if (!fetched || fetched.length === 0) {
         fetched = FALLBACK_WORDS[cat.id] || FALLBACK_WORDS['animals'];
       }
@@ -56,18 +55,13 @@ const App: React.FC = () => {
         category: cat.id
       }));
 
-      const shuffledWords = [...mappedWords].sort(() => Math.random() - 0.5);
-
-      setWords(shuffledWords);
+      setWords([...mappedWords].sort(() => Math.random() - 0.5));
       setMode('CATEGORY_SELECT');
     } catch (err) {
-      console.error("Krytyczny błąd ładowania kategorii:", err);
-      // Ostateczny ratunek - zawsze użyj fallbacków
       const backup = FALLBACK_WORDS[cat.id] || FALLBACK_WORDS['animals'];
       setWords(backup.map((w, i) => ({ id: `${cat.id}-${i}`, ...w, category: cat.id })));
       setMode('CATEGORY_SELECT');
     } finally {
-      // To się wykona ZAWSZE, nawet po błędzie, więc ładowanie zniknie
       setIsLoading(false);
     }
   };
@@ -80,14 +74,15 @@ const App: React.FC = () => {
   const renderContent = () => {
     if (isLoading) {
       return (
-        <div className="flex flex-col items-center justify-center h-full min-h-[60vh] space-y-6">
-          <div className="relative">
-            <div className="w-20 h-20 border-8 border-blue-100 rounded-full"></div>
-            <div className="absolute top-0 left-0 w-20 h-20 border-8 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+        <div className="flex flex-col items-center justify-center h-full min-h-[60vh] space-y-8 animate-in fade-in duration-700">
+          <div className="relative w-32 h-32">
+             <div className="absolute inset-0 border-[12px] border-blue-100 rounded-full"></div>
+             <div className="absolute inset-0 border-[12px] border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+             <div className="absolute inset-0 flex items-center justify-center text-4xl">✨</div>
           </div>
-          <div className="text-center">
-            <p className="text-blue-600 font-bold text-xl animate-pulse">Przygotowuję lekcję...</p>
-            <p className="text-gray-400 text-sm mt-2">To potrwa tylko chwilkę</p>
+          <div className="text-center space-y-2">
+            <h3 className="text-2xl font-black text-gray-800">Cierpliwości...</h3>
+            <p className="text-blue-500 font-bold animate-pulse">Twoja przygoda się ładuje!</p>
           </div>
         </div>
       );
@@ -96,21 +91,21 @@ const App: React.FC = () => {
     switch (mode) {
       case 'HOME':
         return (
-          <div className="space-y-6 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="text-center space-y-1 py-4">
-              <h2 className="text-4xl font-bold text-gray-800 tracking-tight">Cześć! 👋</h2>
-              <p className="text-gray-500 text-lg">Wybierz temat nauki:</p>
+          <div className="space-y-8 pb-24 animate-in fade-in slide-in-from-bottom-6 duration-500">
+            <div className="text-center space-y-2 py-6">
+              <h2 className="text-5xl font-black text-gray-800 tracking-tighter">Cześć! 👋</h2>
+              <p className="text-gray-500 text-xl font-medium">Co dzisiaj odkrywamy?</p>
             </div>
             
-            <div className="grid grid-cols-2 gap-4 px-2">
+            <div className="grid grid-cols-2 gap-5">
               {CATEGORIES.map((cat) => (
                 <button
                   key={cat.id}
                   onClick={() => startCategory(cat)}
-                  className={`flex flex-col items-center p-6 rounded-[2.5rem] ${cat.color} text-white shadow-xl transition-all hover:scale-105 active:scale-95`}
+                  className={`group relative flex flex-col items-center p-7 rounded-[3rem] ${cat.color} text-white shadow-[0_15px_30px_-5px_rgba(0,0,0,0.1)] transition-all hover:scale-[1.03] active:scale-95 border-b-8 border-black/20`}
                 >
-                  <span className="text-5xl mb-3 drop-shadow-md">{cat.icon}</span>
-                  <span className="font-bold text-xl">{cat.name}</span>
+                  <span className="text-6xl mb-4 transform group-hover:rotate-12 transition-transform drop-shadow-xl">{cat.icon}</span>
+                  <span className="font-black text-xl tracking-tight uppercase">{cat.name}</span>
                 </button>
               ))}
             </div>
@@ -125,40 +120,42 @@ const App: React.FC = () => {
 
       case 'CATEGORY_SELECT':
         return (
-          <div className="flex flex-col h-full justify-center space-y-8 min-h-[70vh] animate-in zoom-in duration-300">
-            <div className="text-center p-10 bg-white border-2 border-gray-50 rounded-[3rem] shadow-sm">
-              <span className="text-8xl mb-4 block drop-shadow-lg">{selectedCategory?.icon}</span>
-              <h3 className="text-3xl font-bold text-gray-800">{selectedCategory?.name}</h3>
-              <p className="text-gray-500 text-lg">{words.length} słówek do nauki</p>
+          <div className="flex flex-col h-full justify-center space-y-10 min-h-[75vh] animate-in zoom-in-95 duration-300">
+            <div className="text-center p-12 bg-white rounded-[4rem] shadow-2xl border-b-8 border-gray-100">
+              <div className="inline-block p-6 bg-blue-50 rounded-full mb-6">
+                <span className="text-8xl block animate-bounce-slow">{selectedCategory?.icon}</span>
+              </div>
+              <h3 className="text-4xl font-black text-gray-800 uppercase tracking-tight">{selectedCategory?.name}</h3>
+              <p className="text-blue-400 font-bold text-xl mt-2">{words.length} nowych słówek</p>
             </div>
 
-            <div className="space-y-4">
+            <div className="grid gap-5">
               <button 
                 onClick={() => setMode('LEARN')}
-                className="w-full flex items-center justify-between p-7 bg-blue-500 text-white rounded-[2rem] shadow-lg active:scale-[0.98] transition-all"
+                className="group w-full flex items-center justify-between p-8 bg-blue-500 text-white rounded-[2.5rem] shadow-xl border-b-8 border-blue-700 active:translate-y-1 active:border-b-0 transition-all"
               >
-                <div className="flex items-center space-x-4">
-                  <span className="text-3xl">📖</span>
+                <div className="flex items-center space-x-5">
+                  <span className="text-4xl">📖</span>
                   <div className="text-left">
-                    <h4 className="font-bold text-xl">Zacznij Naukę</h4>
-                    <p className="text-sm opacity-90">Poznaj nowe słowa</p>
+                    <h4 className="font-black text-2xl uppercase tracking-tight">Nauka</h4>
+                    <p className="text-sm font-bold opacity-80">Poznaj słówka</p>
                   </div>
                 </div>
-                <span className="text-2xl font-bold">→</span>
+                <span className="text-3xl font-bold group-hover:translate-x-2 transition-transform">→</span>
               </button>
 
               <button 
                 onClick={() => setMode('TEST')}
-                className="w-full flex items-center justify-between p-7 bg-green-500 text-white rounded-[2rem] shadow-lg active:scale-[0.98] transition-all"
+                className="group w-full flex items-center justify-between p-8 bg-green-500 text-white rounded-[2.5rem] shadow-xl border-b-8 border-green-700 active:translate-y-1 active:border-b-0 transition-all"
               >
-                <div className="flex items-center space-x-4">
-                  <span className="text-3xl">🏆</span>
+                <div className="flex items-center space-x-5">
+                  <span className="text-4xl">🏆</span>
                   <div className="text-left">
-                    <h4 className="font-bold text-xl">Rób Test</h4>
-                    <p className="text-sm opacity-90">Sprawdź swoją wiedzę</p>
+                    <h4 className="font-black text-2xl uppercase tracking-tight">Test</h4>
+                    <p className="text-sm font-bold opacity-80">Zdobądź punkty</p>
                   </div>
                 </div>
-                <span className="text-2xl font-bold">→</span>
+                <span className="text-3xl font-bold group-hover:translate-x-2 transition-transform">→</span>
               </button>
             </div>
           </div>
@@ -167,22 +164,25 @@ const App: React.FC = () => {
       case 'LEARN':
         if (learningFinished) {
           return (
-            <div className="flex flex-col items-center justify-center h-full text-center space-y-10 min-h-[70vh]">
-               <span className="text-9xl animate-bounce">🎉</span>
-               <div>
-                  <h3 className="text-4xl font-bold text-gray-800">Brawo!</h3>
-                  <p className="text-gray-500 text-xl mt-2">Znasz już te słowa!</p>
+            <div className="flex flex-col items-center justify-center h-full text-center space-y-12 min-h-[70vh] animate-in zoom-in duration-500">
+               <div className="relative">
+                  <span className="text-9xl animate-bounce inline-block">🎉</span>
+                  <div className="absolute -top-4 -right-4 animate-ping text-4xl">✨</div>
                </div>
-               <div className="w-full space-y-4 px-4">
+               <div className="space-y-3">
+                  <h3 className="text-5xl font-black text-gray-800 uppercase tracking-tighter">Super Robota!</h3>
+                  <p className="text-gray-500 text-xl font-medium px-8">Wszystkie słówka z tego działu są już w Twojej głowie!</p>
+               </div>
+               <div className="w-full space-y-5 px-6">
                   <button 
                     onClick={() => setMode('TEST')}
-                    className="w-full py-6 bg-green-500 text-white rounded-[2rem] font-bold text-2xl shadow-xl hover:bg-green-600 active:scale-95 transition-all"
+                    className="w-full py-7 bg-green-500 text-white rounded-[2.5rem] font-black text-2xl shadow-2xl border-b-8 border-green-700 active:translate-y-1 active:border-b-0 transition-all"
                   >
-                    Przejdź do Testu
+                    Rób Test! 🏆
                   </button>
                   <button 
-                    onClick={() => setMode('CATEGORY_SELECT')}
-                    className="w-full py-4 text-gray-400 font-bold text-lg"
+                    onClick={() => setMode('HOME')}
+                    className="w-full py-5 text-gray-400 font-black text-lg uppercase tracking-widest"
                   >
                     Wróć do menu
                   </button>
@@ -203,36 +203,40 @@ const App: React.FC = () => {
       case 'TEST':
         if (testScore !== null) {
           const percentage = (testScore / words.length) * 100;
-          let feedback = "Spróbuj jeszcze raz!";
-          let emoji = "😕";
-          if (percentage >= 100) { feedback = "Doskonale!"; emoji = "👑"; }
-          else if (percentage >= 70) { feedback = "Świetnie!"; emoji = "🌟"; }
-          else if (percentage >= 50) { feedback = "Dobrze!"; emoji = "👍"; }
+          let feedback = "Głowa do góry!";
+          let emoji = "💪";
+          let color = "text-orange-500";
+          
+          if (percentage >= 100) { feedback = "Król Angielskiego!"; emoji = "👑"; color = "text-yellow-500"; }
+          else if (percentage >= 80) { feedback = "Wspaniale!"; emoji = "🌟"; color = "text-green-500"; }
+          else if (percentage >= 50) { feedback = "Bardzo dobrze!"; emoji = "👍"; color = "text-blue-500"; }
 
           return (
-            <div className="flex flex-col items-center justify-center h-full text-center space-y-6 min-h-[70vh]">
-              <span className="text-9xl">{emoji}</span>
-              <div className="space-y-1">
-                <h3 className="text-4xl font-bold text-gray-800">{feedback}</h3>
-                <p className="text-gray-500 text-2xl">Wynik: <span className="text-blue-600 font-bold">{testScore}/{words.length}</span></p>
+            <div className="flex flex-col items-center justify-center h-full text-center space-y-8 min-h-[75vh] animate-in slide-in-from-bottom-10 duration-500">
+              <span className="text-[120px] drop-shadow-2xl">{emoji}</span>
+              <div className="space-y-2">
+                <h3 className="text-4xl font-black text-gray-800 uppercase tracking-tight">{feedback}</h3>
+                <p className={`text-3xl font-black ${color}`}>
+                  {testScore} / {words.length}
+                </p>
               </div>
               
-              <div className="w-full max-w-[280px] h-6 bg-gray-100 rounded-full overflow-hidden mt-4 border-2 border-white shadow-inner">
-                <div className="bg-green-500 h-full transition-all duration-1000" style={{ width: `${percentage}%` }} />
+              <div className="w-full max-w-[280px] h-8 bg-white rounded-full overflow-hidden p-1.5 border-2 border-gray-100 shadow-inner">
+                <div className="bg-green-500 h-full rounded-full transition-all duration-[1500ms] ease-out shadow-[0_0_15px_rgba(34,197,94,0.4)]" style={{ width: `${percentage}%` }} />
               </div>
 
-              <div className="w-full space-y-4 pt-8 px-4">
+              <div className="w-full space-y-5 pt-8 px-6">
                 <button 
                   onClick={() => { setTestScore(null); setMode('TEST'); }}
-                  className="w-full py-6 bg-blue-600 text-white rounded-[2rem] font-bold text-2xl shadow-xl active:scale-95 transition-all"
+                  className="w-full py-7 bg-blue-600 text-white rounded-[2.5rem] font-black text-2xl shadow-xl border-b-8 border-blue-800 active:translate-y-1 active:border-b-0 transition-all"
                 >
-                  Jeszcze raz
+                  Spróbuj jeszcze raz
                 </button>
                 <button 
                   onClick={() => setMode('HOME')}
-                  className="w-full py-5 bg-gray-100 text-gray-600 rounded-[2rem] font-bold text-xl active:scale-95 transition-all"
+                  className="w-full py-5 bg-white text-gray-500 rounded-[2.5rem] font-black text-xl border-b-4 border-gray-200 active:translate-y-1 active:border-b-0 transition-all"
                 >
-                  Inna kategoria
+                  Inny temat
                 </button>
               </div>
             </div>
@@ -257,9 +261,9 @@ const App: React.FC = () => {
     <Layout 
       onBack={mode !== 'HOME' ? handleBack : undefined}
       title={
-        mode === 'DICTIONARY' ? "Słownik A1" : 
-        mode === 'PROGRESS' ? "Twoje Postępy" :
-        (selectedCategory ? selectedCategory.name : "Angielski dla Dzieci")
+        mode === 'DICTIONARY' ? "Słowniczek" : 
+        mode === 'PROGRESS' ? "Moje Odznaki" :
+        (selectedCategory ? selectedCategory.name : "Angielski A1")
       }
       onNavigateHome={() => setMode('HOME')}
       onNavigateDictionary={() => setMode('DICTIONARY')}
