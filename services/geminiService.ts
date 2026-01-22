@@ -3,7 +3,6 @@ import { GoogleGenAI, Type, Modality } from "@google/genai";
 
 export const getGeminiInstance = () => {
   const apiKey = process.env.API_KEY;
-  // Sprawdzamy czy klucz nie jest pusty lub nie jest napisem "undefined"
   if (!apiKey || apiKey === "undefined" || apiKey === "") {
     console.warn("Brak klucza API_KEY. Sprawdź Environment Variables w panelu Vercel.");
     return null;
@@ -13,14 +12,9 @@ export const getGeminiInstance = () => {
 
 export async function fetchCategoryWords(categoryName: string): Promise<{ english: string; polish: string }[]> {
   const ai = getGeminiInstance();
-  if (!ai) {
-    console.log("Przechodzę do trybu offline (brak klucza API).");
-    return [];
-  }
+  if (!ai) return [];
 
   try {
-    console.log(`Próba pobrania słówek dla: ${categoryName}`);
-    
     const fetchPromise = ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `Provide 15 basic A1 level English words related to '${categoryName}' with their Polish translations.`,
@@ -40,23 +34,23 @@ export async function fetchCategoryWords(categoryName: string): Promise<{ englis
       }
     });
 
-    // Ścisły limit 5 sekund - jeśli API nie odpowie, idziemy dalej
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error("Zbyt długi czas oczekiwania na API")), 5000)
+      setTimeout(() => reject(new Error("Timeout")), 5000)
     );
 
     const response: any = await Promise.race([fetchPromise, timeoutPromise]);
     const text = response.text;
-    console.log("Słówka pobrane pomyślnie.");
     return text ? JSON.parse(text) : [];
   } catch (error) {
-    console.error("Błąd usługi Gemini:", error);
-    return []; // Zwracamy pustą tablicę, co wymusi użycie słówek awaryjnych (FALLBACK_WORDS)
+    console.error("Błąd pobierania słówek:", error);
+    return [];
   }
 }
 
 export async function playPronunciation(text: string) {
   const ai = getGeminiInstance();
+  
+  // Jeśli nie ma klucza API, używamy systemowego lektora z lepszymi parametrami
   if (!ai) {
     speakFallback(text);
     return;
@@ -65,12 +59,13 @@ export async function playPronunciation(text: string) {
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text: `Say clearly: ${text}` }] }],
+      contents: [{ parts: [{ text: `Say it clearly and naturally: ${text}` }] }],
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
           voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Kore' },
+            // 'Zephyr' brzmi bardzo naturalnie, ciepło i mniej "elektrycznie" niż inne głosy
+            prebuiltVoiceConfig: { voiceName: 'Zephyr' },
           },
         },
       },
@@ -90,14 +85,17 @@ export async function playPronunciation(text: string) {
       speakFallback(text);
     }
   } catch (error) {
-    console.error("Błąd wymowy Gemini, używam systemowej:", error);
+    console.error("Błąd wymowy AI, używam systemowej:", error);
     speakFallback(text);
   }
 }
 
+// Ulepszony lektor systemowy (używany gdy API nie działa)
 function speakFallback(text: string) {
   const uttr = new SpeechSynthesisUtterance(text);
   uttr.lang = 'en-US';
+  uttr.rate = 0.9; // Nieco wolniej, żeby było wyraźniej dla dziecka
+  uttr.pitch = 1.1; // Nieco wyższy głos, bardziej przyjazny
   window.speechSynthesis.speak(uttr);
 }
 
