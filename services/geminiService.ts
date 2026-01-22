@@ -1,17 +1,29 @@
 
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 
-// Always use process.env.API_KEY directly when initializing the GoogleGenAI client instance
 export const getGeminiInstance = () => {
-  return new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = process.env.API_KEY;
+  // Sprawdzamy czy klucz nie jest pusty lub nie jest napisem "undefined"
+  if (!apiKey || apiKey === "undefined" || apiKey === "") {
+    console.warn("Brak klucza API_KEY. Sprawdź Environment Variables w panelu Vercel.");
+    return null;
+  }
+  return new GoogleGenAI({ apiKey });
 };
 
 export async function fetchCategoryWords(categoryName: string): Promise<{ english: string; polish: string }[]> {
   const ai = getGeminiInstance();
+  if (!ai) {
+    console.log("Przechodzę do trybu offline (brak klucza API).");
+    return [];
+  }
+
   try {
-    const response = await ai.models.generateContent({
+    console.log(`Próba pobrania słówek dla: ${categoryName}`);
+    
+    const fetchPromise = ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Provide 20 basic A1 level English words related to '${categoryName}' with their Polish translations.`,
+      contents: `Provide 15 basic A1 level English words related to '${categoryName}' with their Polish translations.`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -28,17 +40,28 @@ export async function fetchCategoryWords(categoryName: string): Promise<{ englis
       }
     });
 
-    // The GenerateContentResponse features a text property (not a method)
+    // Ścisły limit 5 sekund - jeśli API nie odpowie, idziemy dalej
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error("Zbyt długi czas oczekiwania na API")), 5000)
+    );
+
+    const response: any = await Promise.race([fetchPromise, timeoutPromise]);
     const text = response.text;
+    console.log("Słówka pobrane pomyślnie.");
     return text ? JSON.parse(text) : [];
   } catch (error) {
-    console.error("Error fetching words:", error);
-    return [];
+    console.error("Błąd usługi Gemini:", error);
+    return []; // Zwracamy pustą tablicę, co wymusi użycie słówek awaryjnych (FALLBACK_WORDS)
   }
 }
 
 export async function playPronunciation(text: string) {
   const ai = getGeminiInstance();
+  if (!ai) {
+    speakFallback(text);
+    return;
+  }
+
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
@@ -53,7 +76,6 @@ export async function playPronunciation(text: string) {
       },
     });
 
-    // Extract raw PCM audio data from the response part
     const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
     if (base64Audio) {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
@@ -64,13 +86,21 @@ export async function playPronunciation(text: string) {
       source.buffer = audioBuffer;
       source.connect(audioCtx.destination);
       source.start();
+    } else {
+      speakFallback(text);
     }
   } catch (error) {
-    console.error("Error playing audio:", error);
+    console.error("Błąd wymowy Gemini, używam systemowej:", error);
+    speakFallback(text);
   }
 }
 
-// Manual base64 decoding implementation following SDK guidelines
+function speakFallback(text: string) {
+  const uttr = new SpeechSynthesisUtterance(text);
+  uttr.lang = 'en-US';
+  window.speechSynthesis.speak(uttr);
+}
+
 function decode(base64: string) {
   const binaryString = atob(base64);
   const len = binaryString.length;
@@ -81,7 +111,6 @@ function decode(base64: string) {
   return bytes;
 }
 
-// Custom decoding logic for raw PCM data streams returned by Gemini
 async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampleRate: number, numChannels: number): Promise<AudioBuffer> {
   const dataInt16 = new Int16Array(data.buffer);
   const frameCount = dataInt16.length / numChannels;
