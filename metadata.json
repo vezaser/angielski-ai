@@ -1,0 +1,7 @@
+{
+  "name": "Angielski dla Dzieci (A1)",
+  "description": "Przyjazna aplikacja do nauki języka angielskiego dla dzieci na poziomie A1, oferująca moduły nauki i testów z interaktywną wymową.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
